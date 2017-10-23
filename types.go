@@ -1,9 +1,27 @@
 package rolling
 
+// Aggregate is a rolled up value.
+type Aggregate struct {
+	Source *Aggregate
+	Name   string
+	Value  float64
+}
+
 // Aggregator is responsible for compacting a window of time into a single
 // value for evaluation.
 type Aggregator interface {
-	Aggregate() float64
+	Aggregate() *Aggregate
+}
+
+// Namer is a named component.
+type Namer interface {
+	Name() string
+}
+
+// Rollup is an annotated Aggregator of data.
+type Rollup interface {
+	Aggregator
+	Namer
 }
 
 // Feeder populates a rolling window of data with input.

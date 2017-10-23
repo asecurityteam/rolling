@@ -60,12 +60,12 @@ each data point contained within the window.
 
 For ease of use, some common aggregations are included in this package. Namely,
 
-- NewCountAggregator(iterator Iterator)
-- NewSumAggregator(iterator Iterator)
-- NewMinAggregator(iterator Iterator)
-- NewMaxAggregator(iterator Iterator)
-- NewAverageAggregator(iterator Iterator)
-- NewPercentileAggregator(percentile float64, iterator Iterator, preallocHint int)
+- NewCountRollup(iterator Iterator, name string)
+- NewSumRollup(iterator Iterator, name string)
+- NewMinRollup(iterator Iterator, name string)
+- NewMaxRollup(iterator Iterator, name string)
+- NewAverageRollup(iterator Iterator, name string)
+- NewPercentileRollup(percentile float64, iterator Iterator, preallocHint int, name string)
 
 The count, sum, min, max, and average each run their respected aggregations on
 all data contained within a window. The percentile aggregate calculates the Nth
@@ -77,7 +77,7 @@ rolling metric value. However, there is occasionally the need to convert the
 aggregate into some other value for decision making. The most common evaluation
 is converting the aggregate into some percentage value for decision making. To
 make this easier, this package includes a
-`NewPercentageAggregator(aggregator Aggregator, lower float64, upper float64)`
+`NewPercentageRollup(aggregator Aggregator, lower float64, upper float64, name string)`
 which, when the `Aggregate()` method is called, will take the result of the
 inner aggregate and generate a value that represents the percentage between
 `lower` and `upper` of that value. If the inner aggregate is less than the lower
@@ -86,7 +86,7 @@ value is always 1.0.
 
 When evaluating data for decision making, it is also common practice to protect
 against sparse data. To help with this practice this package also contains a
-`NewLimitedAggregator(limit int, iterator Iterator, aggregator Aggregator)`
+`NewLimitedRollup(limit int, iterator Iterator, rollup Rollup)`
 which will return 0.0 for all calls to `Aggregate()` when the given window
 contains less than `limit` values.
 
@@ -99,11 +99,11 @@ var windowSize = 100
 // rolling 100 point window
 var window = rolling.NewPointWindow(windowSize)
 // aggregate values with an average
-var avg = rolling.NewAverageAggregator(window)
+var avg = rolling.NewAverageRollup(window, "average-value")
 
 for x := 0; x < 1000; x = x + 1 {
   window.Feed(float64(x))
-  log.Printf("Average = %f\n", avg.Aggregate())
+  log.Printf("%s = %f\n", avg.Name(), avg.Aggregate())
 }
 ```
 
@@ -116,11 +116,11 @@ var preallocHint = 1000
 // ten second rolling window with a one second bucket
 var window =  rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
 // aggregate to a 99th percentile
-var percentile = rolling.NewPercentileAggregate(99, w, preallocHint)
+var percentile = rolling.NewPercentileRollup(99, window, preallocHint, "99th Percentile")
 // start emitting non-zero values after 100ms and emit for all values over 1s
-var percentage = rolling.NewPercentageEvaluator(a, .1, 1)
+var percentage = rolling.NewPercentageRollup(window, .1, 1, "Percentage Slow")
 // ensure that there are at least as many points as required to satisfy the percentile
-var limited = rolling.NewLimitedEvaluator(100, w, percentage)
+var limited = rolling.NewLimitedRollup(100, w, percentage)
 
 for _ = range time.Tick(time.Millisecond) {
   var start = time.Now()
@@ -130,42 +130,10 @@ for _ = range time.Tick(time.Millisecond) {
   // get more frequent as the 99th percentile of latency approaches 1s. all 99th
   // percentiles beyond 1s will be reported.
   var chance = rand.Float64()
-  if chance < limited.Evaluate() {
-    log.Printf("99th = %f\n", percentile.Aggregate())
+  if chance < limited.Aggregate() {
+    log.Printf("%s = %f\n", percentile.Name(), percentile.Aggregate())
   }
 }
-```
-
-### Dice Roll Percentage From Multiple Metrics ###
-
-```golang
-var bucketSize = time.Millisecond
-var numberOfBuckets = 1000
-var preallocHint = 1000
-// one second rolling windows for latency data
-var incomingRequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
-var outgoingrequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
-
-go func(w rolling.Window){
-  for {
-    // Record incoming latency data
-  }
-}(incomingRequests)
-go func(w rolling.Window){
-  for {
-    // Record outgoing latency data
-  }
-}(outgoingRequests)
-
-var incomingAvg = rolling.NewAverageAggregator(incomingRequests)
-var outgoingAvg = rolling.NewAverageAggregator(outgoingRequests)
-var combined = rolling.NewAggregatorIterator(incomingAvg, outgoingAvg)
-var maxCombined = rolling.NewMaxAggregator(combined)
-var lower = .1
-var upper = 1.0
-// generate a percentage between 100ms and 1000ms of the highest reported avg
-// latency for incoming and outgoing request metrics.
-var percCombined = rolling.NewPercentageAggregator(maxCombined, lower, upper)
 ```
 
 ## Contributing ##

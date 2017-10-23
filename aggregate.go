@@ -60,14 +60,19 @@ func max(it Iterator) float64 {
 	return result
 }
 
-type percentileAggregator struct {
+type percentileRollup struct {
 	iterator   Iterator
 	values     []float64
 	percentile float64
 	lock       *sync.Mutex
+	name       string
 }
 
-func (a *percentileAggregator) Aggregate() float64 {
+func (a *percentileRollup) Name() string {
+	return a.name
+}
+
+func (a *percentileRollup) Aggregate() *Aggregate {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.values = a.values[:0]
@@ -75,10 +80,18 @@ func (a *percentileAggregator) Aggregate() float64 {
 		a.values = append(a.values, p)
 	})
 	if len(a.values) < 1 {
-		return 0.0
+		return &Aggregate{
+			Source: nil,
+			Name:   a.Name(),
+			Value:  0.0,
+		}
 	}
 	if len(a.values) < 2 {
-		return a.values[0]
+		return &Aggregate{
+			Source: nil,
+			Name:   a.Name(),
+			Value:  a.values[0],
+		}
 	}
 	sort.Float64s(a.values)
 	var n = (a.percentile/100)*float64(len(a.values)) - 1
@@ -88,49 +101,62 @@ func (a *percentileAggregator) Aggregate() float64 {
 		plusOne = k
 	}
 	var f = math.Mod(n, 1)
-	return ((1 - f) * a.values[k]) + (f * a.values[plusOne])
+	return &Aggregate{
+		Source: nil,
+		Name:   a.Name(),
+		Value:  ((1 - f) * a.values[k]) + (f * a.values[plusOne]),
+	}
 }
 
-type simpleAggregator struct {
+type simpleRollup struct {
 	iterator Iterator
 	f        func(Iterator) float64
+	name     string
 }
 
-func (a *simpleAggregator) Aggregate() float64 {
-	return a.f(a.iterator)
+func (a *simpleRollup) Aggregate() *Aggregate {
+	return &Aggregate{
+		Source: nil,
+		Name:   a.Name(),
+		Value:  a.f(a.iterator),
+	}
 }
 
-// NewCountAggregator returns an Aggregator that computes the total number of
+func (a *simpleRollup) Name() string {
+	return a.name
+}
+
+// NewCountRollup returns an Aggregator that computes the total number of
 // elements in a window.
-func NewCountAggregator(iterator Iterator) Aggregator {
-	return &simpleAggregator{iterator: iterator, f: count}
+func NewCountRollup(iterator Iterator, name string) Rollup {
+	return &simpleRollup{iterator: iterator, f: count, name: name}
 }
 
-// NewSumAggregator returns an Aggregator that computes the sum of all values
+// NewSumRollup returns an Aggregator that computes the sum of all values
 // in a window.
-func NewSumAggregator(iterator Iterator) Aggregator {
-	return &simpleAggregator{iterator: iterator, f: sum}
+func NewSumRollup(iterator Iterator, name string) Rollup {
+	return &simpleRollup{iterator: iterator, f: sum, name: name}
 }
 
-// NewMinAggregator returns an Aggregator that computes the min of all values
+// NewMinRollup returns an Aggregator that computes the min of all values
 // in a window.
-func NewMinAggregator(iterator Iterator) Aggregator {
-	return &simpleAggregator{iterator: iterator, f: min}
+func NewMinRollup(iterator Iterator, name string) Rollup {
+	return &simpleRollup{iterator: iterator, f: min, name: name}
 }
 
-// NewMaxAggregator returns an Aggregator that computes the max of all values
+// NewMaxRollup returns an Aggregator that computes the max of all values
 // in a window.
-func NewMaxAggregator(iterator Iterator) Aggregator {
-	return &simpleAggregator{iterator: iterator, f: max}
+func NewMaxRollup(iterator Iterator, name string) Rollup {
+	return &simpleRollup{iterator: iterator, f: max, name: name}
 }
 
-// NewAverageAggregator returns an Aggregator that computes the average of all values
+// NewAverageRollup returns an Aggregator that computes the average of all values
 // in a window.
-func NewAverageAggregator(iterator Iterator) Aggregator {
-	return &simpleAggregator{iterator: iterator, f: avg}
+func NewAverageRollup(iterator Iterator, name string) Rollup {
+	return &simpleRollup{iterator: iterator, f: avg, name: name}
 }
 
-// NewPercentileAggregator returns an Aggregator that computes the given
+// NewPercentileRollup returns an Aggregator that computes the given
 // percentile of the values in a window. The given percentile is evaluated as
 // N percentile such that the value 10.0 is considered to be 10.0 percentile.
 // Non-whole numbers maybe be given to calculate, for example, the 99.9
@@ -138,74 +164,82 @@ func NewAverageAggregator(iterator Iterator) Aggregator {
 // data then the exact value is returned. If it cannot be resolved exactly, such
 // as cases where there are not enough data to, then the result will be based on
 // linear interpolation of the two closest points.
-func NewPercentileAggregator(percentile float64, iterator Iterator, preallocHint int) Aggregator {
-	return &percentileAggregator{
+func NewPercentileRollup(percentile float64, iterator Iterator, preallocHint int, name string) Rollup {
+	return &percentileRollup{
 		iterator:   iterator,
 		values:     make([]float64, preallocHint),
 		percentile: percentile,
 		lock:       &sync.Mutex{},
+		name:       name,
 	}
 }
 
-type percentageAggregateor struct {
+type percentageRollup struct {
 	aggregator    Aggregator
 	lower         float64
 	upper         float64
 	adjustedUpper float64
+	name          string
 }
 
-func (e *percentageAggregateor) Aggregate() float64 {
-	var value = e.aggregator.Aggregate() - e.lower
+func (e *percentageRollup) Name() string {
+	return e.name
+}
+
+func (e *percentageRollup) Aggregate() *Aggregate {
+	var p = e.aggregator.Aggregate()
+	var value = p.Value - e.lower
 	if value <= 0 {
-		return 0
+		return &Aggregate{
+			Source: p,
+			Name:   e.Name(),
+			Value:  0,
+		}
 	}
-	return value / e.adjustedUpper
+	return &Aggregate{
+		Source: p,
+		Name:   e.Name(),
+		Value:  value / e.adjustedUpper,
+	}
 }
 
-// NewPercentageAggregator creates an Aggregator that returns the percent between
+// NewPercentageRollup creates an Aggregator that returns the percent between
 // lower and upper of the aggregate value. If the aggregate is less than the
 // lower then the result is 0.
-func NewPercentageAggregator(aggregator Aggregator, lower float64, upper float64) Aggregator {
-	return &percentageAggregateor{
+func NewPercentageRollup(aggregator Aggregator, lower float64, upper float64, name string) Rollup {
+	return &percentageRollup{
 		aggregator:    aggregator,
 		lower:         lower,
 		upper:         upper,
 		adjustedUpper: upper - lower,
+		name:          name,
 	}
 }
 
-type limitedAggregator struct {
-	evaluator Aggregator
-	counter   Aggregator
-	limit     float64
+type limitedRollup struct {
+	rollup  Rollup
+	counter Aggregator
+	limit   float64
 }
 
-func (e *limitedAggregator) Aggregate() float64 {
-	if e.counter.Aggregate() < e.limit {
-		return 0
+func (e *limitedRollup) Name() string {
+	return e.rollup.Name()
+}
+
+func (e *limitedRollup) Aggregate() *Aggregate {
+	if e.counter.Aggregate().Value < e.limit {
+		return &Aggregate{
+			Source: nil,
+			Name:   e.Name(),
+			Value:  0,
+		}
 	}
-	return e.evaluator.Aggregate()
+	return e.rollup.Aggregate()
 }
 
-// NewLimitedAggregator creates an Aggregator that returns zero until the given
+// NewLimitedRollup creates an Aggregator that returns zero until the given
 // iterator contains more than `limit` values are contained. Once the limit is
 // passed, the given Aggregator is called to produce the output.
-func NewLimitedAggregator(limit int, iterator Iterator, evaluator Aggregator) Aggregator {
-	return &limitedAggregator{evaluator: evaluator, counter: NewCountAggregator(iterator), limit: float64(limit)}
-}
-
-type aggregatorIterator struct {
-	aggregators []Aggregator
-}
-
-func (e *aggregatorIterator) Iterate(fn func(float64)) {
-	for _, evaluator := range e.aggregators {
-		fn(evaluator.Aggregate())
-	}
-}
-
-// NewAggregatorIterator converts a set of aggregators into an iterator that
-// can be fed back into an Aggregator for selecting on multiple windows.
-func NewAggregatorIterator(aggregators ...Aggregator) Iterator {
-	return &aggregatorIterator{aggregators}
+func NewLimitedRollup(limit int, iterator Iterator, rollup Rollup) Rollup {
+	return &limitedRollup{rollup: rollup, counter: NewCountRollup(iterator, ""), limit: float64(limit)}
 }
