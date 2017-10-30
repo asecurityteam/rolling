@@ -136,6 +136,52 @@ for _ = range time.Tick(time.Millisecond) {
 }
 ```
 
+### Dice Roll Percentage From Multiple Metrics ###
+
+```golang
+var bucketSize = time.Millisecond
+var numberOfBuckets = 1000
+var preallocHint = 1000
+// one second rolling windows for latency data
+var incomingRequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
+var outgoingrequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
+
+go func(w rolling.Window){
+  for {
+    // Record incoming latency data
+  }
+}(incomingRequests)
+go func(w rolling.Window){
+  for {
+    // Record outgoing latency data
+  }
+}(outgoingRequests)
+
+var incomingAvg = rolling.NewAverageAggregator(incomingRequests)
+var outgoingAvg = rolling.NewAverageAggregator(outgoingRequests)
+var lower = .1
+var upper = 1.0
+// generate a percentage between 100ms and 1000ms of the reported avg
+// latency for incoming and outgoing request metrics.
+var percIncoming = rolling.NewPercentageAggregator(incomingAvg, lower, upper)
+var percOutgoing = rolling.NewPercentageAggregator(outgoingAvg, lower, upper)
+
+for {
+  // Select the maximum reported percentage value and compare it to a dice
+  // roll. This can be used to implement proportional branching of behaviour
+  // based on the reported values.
+  var chance = percIncoming.Aggregate()
+  var outgoingChance = perceOutgoing.Aggregate()
+  if outgoingChance.Value > chance.Value {
+    chance = outgoingChance
+  }
+  var diceRoll = rand.Float64()
+  if diceRoll < chance.Value {
+    // Do something different than usual.
+  }
+}
+```
+
 ## Contributing ##
 
 ### License ###
