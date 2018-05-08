@@ -54,6 +54,58 @@ func TestPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
 	}
 }
 
+func TestFastPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
+	// Using a larger dataset so that the algorithm can converge on the
+	// correct value. Smaller datasets where the value might be interpolated
+	// linearly in the typical percentile calculation results in larger error
+	// in the result. This is acceptable so long as the estimated value approaches
+	// the correct value as more data are given.
+	var numberOfPoints = 10000
+	var w = NewPointWindow(numberOfPoints)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		w.Append(float64(x))
+	}
+	var perc = 99.9
+	var a = FastPercentile(perc)
+	var result = a(w)
+	var expected = 9990.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
+	}
+}
+
+func TestFastPercentileAggregateUsingPSquaredDataSet(t *testing.T) {
+	var numberOfPoints = 20
+	var w = NewPointWindow(numberOfPoints)
+	w.Append(0.02)
+	w.Append(0.15)
+	w.Append(0.74)
+	w.Append(0.83)
+	w.Append(3.39)
+	w.Append(22.37)
+	w.Append(10.15)
+	w.Append(15.43)
+	w.Append(38.62)
+	w.Append(15.92)
+	w.Append(34.60)
+	w.Append(10.28)
+	w.Append(1.47)
+	w.Append(0.40)
+	w.Append(0.05)
+	w.Append(11.39)
+	w.Append(0.27)
+	w.Append(0.42)
+	w.Append(0.09)
+	w.Append(11.37)
+	var perc = 50.0
+	var a = FastPercentile(perc)
+	var result = a(w)
+	var expected = 4.44
+	if !floatMostlyEquals(result, expected) {
+		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
+	}
+}
+
 var aggregateResult float64
 
 type aggregateBench struct {
@@ -72,6 +124,8 @@ func BenchmarkAggregates(b *testing.B) {
 		{aggregate: Count, aggregateName: "count"},
 		{aggregate: Percentile(50.0), aggregateName: "p50"},
 		{aggregate: Percentile(99.9), aggregateName: "p99.9"},
+		{aggregate: FastPercentile(50.0), aggregateName: "fp50"},
+		{aggregate: FastPercentile(99.9), aggregateName: "fp99.9"},
 	}
 	var insertions = []int{1, 1000, 10000, 100000}
 	var benchCases = make([]*aggregateBench, 0, len(baseCases)*len(insertions))
