@@ -20,13 +20,14 @@ func floatMostlyEquals(a float64, b float64) bool {
 
 func TestPercentileAggregateInterpolateWhenInsufficientData(t *testing.T) {
 	var numberOfPoints = 100
-	var w = NewPointWindow(numberOfPoints)
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
 	for x := 1; x <= numberOfPoints; x = x + 1 {
-		w.Append(float64(x))
+		p.Append(float64(x))
 	}
 	var perc = 99.9
 	var a = Percentile(perc)
-	var result = a(w)
+	var result = p.Reduce(a)
 
 	// When there are insufficient values to satisfy the precision then the
 	// percentile algorithm degenerates to a max function. In this case, we need
@@ -41,13 +42,14 @@ func TestPercentileAggregateInterpolateWhenInsufficientData(t *testing.T) {
 
 func TestPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
 	var numberOfPoints = 1000
-	var w = NewPointWindow(numberOfPoints)
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
 	for x := 1; x <= numberOfPoints; x = x + 1 {
-		w.Append(float64(x))
+		p.Append(float64(x))
 	}
 	var perc = 99.9
 	var a = Percentile(perc)
-	var result = a(w)
+	var result = p.Reduce(a)
 	var expected = 999.5
 	if !floatEquals(result, expected) {
 		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
@@ -61,13 +63,14 @@ func TestFastPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
 	// in the result. This is acceptable so long as the estimated value approaches
 	// the correct value as more data are given.
 	var numberOfPoints = 10000
-	var w = NewPointWindow(numberOfPoints)
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
 	for x := 1; x <= numberOfPoints; x = x + 1 {
-		w.Append(float64(x))
+		p.Append(float64(x))
 	}
 	var perc = 99.9
 	var a = FastPercentile(perc)
-	var result = a(w)
+	var result = p.Reduce(a)
 	var expected = 9990.0
 	if !floatEquals(result, expected) {
 		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
@@ -76,30 +79,31 @@ func TestFastPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
 
 func TestFastPercentileAggregateUsingPSquaredDataSet(t *testing.T) {
 	var numberOfPoints = 20
-	var w = NewPointWindow(numberOfPoints)
-	w.Append(0.02)
-	w.Append(0.15)
-	w.Append(0.74)
-	w.Append(0.83)
-	w.Append(3.39)
-	w.Append(22.37)
-	w.Append(10.15)
-	w.Append(15.43)
-	w.Append(38.62)
-	w.Append(15.92)
-	w.Append(34.60)
-	w.Append(10.28)
-	w.Append(1.47)
-	w.Append(0.40)
-	w.Append(0.05)
-	w.Append(11.39)
-	w.Append(0.27)
-	w.Append(0.42)
-	w.Append(0.09)
-	w.Append(11.37)
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	p.Append(0.02)
+	p.Append(0.15)
+	p.Append(0.74)
+	p.Append(0.83)
+	p.Append(3.39)
+	p.Append(22.37)
+	p.Append(10.15)
+	p.Append(15.43)
+	p.Append(38.62)
+	p.Append(15.92)
+	p.Append(34.60)
+	p.Append(10.28)
+	p.Append(1.47)
+	p.Append(0.40)
+	p.Append(0.05)
+	p.Append(11.39)
+	p.Append(0.27)
+	p.Append(0.42)
+	p.Append(0.09)
+	p.Append(11.37)
 	var perc = 50.0
 	var a = FastPercentile(perc)
-	var result = a(w)
+	var result = p.Reduce(a)
 	var expected = 4.44
 	if !floatMostlyEquals(result, expected) {
 		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
@@ -108,10 +112,14 @@ func TestFastPercentileAggregateUsingPSquaredDataSet(t *testing.T) {
 
 var aggregateResult float64
 
+type policy interface {
+	Append(float64)
+	Reduce(func(Window) float64) float64
+}
 type aggregateBench struct {
 	inserts       int
-	window        iteratable
-	aggregate     func(iteratable) float64
+	policy        policy
+	aggregate     func(Window) float64
 	aggregateName string
 }
 
@@ -131,15 +139,16 @@ func BenchmarkAggregates(b *testing.B) {
 	var benchCases = make([]*aggregateBench, 0, len(baseCases)*len(insertions))
 	for _, baseCase := range baseCases {
 		for _, inserts := range insertions {
-			var w = NewPointWindow(inserts)
+			var w = NewWindow(inserts)
+			var p = NewPointPolicy(w)
 			for x := 1; x <= inserts; x = x + 1 {
-				w.Append(float64(x))
+				p.Append(float64(x))
 			}
 			benchCases = append(benchCases, &aggregateBench{
 				inserts:       inserts,
 				aggregate:     baseCase.aggregate,
 				aggregateName: baseCase.aggregateName,
-				window:        w,
+				policy:        p,
 			})
 		}
 	}
@@ -149,7 +158,7 @@ func BenchmarkAggregates(b *testing.B) {
 			var result float64
 			bt.ResetTimer()
 			for n := 0; n < bt.N; n = n + 1 {
-				result = benchCase.aggregate(benchCase.window)
+				result = benchCase.policy.Reduce(benchCase.aggregate)
 			}
 			aggregateResult = result
 		})

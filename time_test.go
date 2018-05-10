@@ -10,14 +10,20 @@ import (
 func TestTimeWindow(t *testing.T) {
 	var bucketSize = time.Millisecond * 50
 	var numberBuckets = 10
-	var w = NewTimeWindow(bucketSize, numberBuckets)
+	var w = NewWindow(numberBuckets)
+	var p = NewTimePolicy(w, bucketSize)
 	for x := 0; x < numberBuckets; x = x + 1 {
-		w.Append(1)
+		p.Append(1)
 		time.Sleep(bucketSize)
 	}
-	var final float64
-	w.Iterate(func(p float64) {
-		final = final + p
+	var final = p.Reduce(func(w Window) float64 {
+		var result float64
+		for _, bucket := range w {
+			for _, point := range bucket {
+				result = result + point
+			}
+		}
+		return result
 	})
 	if final != float64(numberBuckets) {
 		t.Fatal(final)
@@ -27,25 +33,26 @@ func TestTimeWindow(t *testing.T) {
 func TestTimeWindowSelectBucket(t *testing.T) {
 	var bucketSize = time.Millisecond * 50
 	var numberBuckets = 10
-	var w = NewTimeWindow(bucketSize, numberBuckets)
+	var w = NewWindow(numberBuckets)
+	var p = NewTimePolicy(w, bucketSize)
 	var target = time.Unix(0, 0)
-	var adjustedTime, bucket = w.selectBucket(target)
+	var adjustedTime, bucket = p.selectBucket(target)
 	if bucket != 0 {
 		t.Fatalf("expected bucket 0 but got %d %v", bucket, adjustedTime)
 	}
 	target = time.Unix(0, int64(50*time.Millisecond))
-	_, bucket = w.selectBucket(target)
+	_, bucket = p.selectBucket(target)
 	if bucket != 1 {
 		t.Fatalf("expected bucket 1 but got %d %v", bucket, target)
 	}
 	target = time.Unix(0, int64(50*time.Millisecond)*10)
-	_, bucket = w.selectBucket(target)
-	if bucket != 10 {
+	_, bucket = p.selectBucket(target)
+	if bucket != 0 {
 		t.Fatalf("expected bucket 10 but got %d %v", bucket, target)
 	}
 	target = time.Unix(0, int64(50*time.Millisecond)*11)
-	_, bucket = w.selectBucket(target)
-	if bucket != 0 {
+	_, bucket = p.selectBucket(target)
+	if bucket != 1 {
 		t.Fatalf("expected bucket 0 but got %d %v", bucket, target)
 	}
 }
@@ -53,32 +60,33 @@ func TestTimeWindowSelectBucket(t *testing.T) {
 func TestTimeWindowConsistency(t *testing.T) {
 	var bucketSize = time.Millisecond * 50
 	var numberBuckets = 10
-	var w = NewTimeWindow(bucketSize, numberBuckets)
-	for offset := range w.window {
-		w.window[offset] = append(w.window[offset], 1)
+	var w = NewWindow(numberBuckets)
+	var p = NewTimePolicy(w, bucketSize)
+	for offset := range p.window {
+		p.window[offset] = append(p.window[offset], 1)
 	}
-	w.lastWindowTime = time.Now().UnixNano()
-	w.lastWindowOffset = 0
+	p.lastWindowTime = time.Now().UnixNano()
+	p.lastWindowOffset = 0
 	var target = time.Unix(1, 0)
-	var adjustedTime, bucket = w.selectBucket(target)
-	w.keepConsistent(adjustedTime, bucket)
-	if len(w.window[0]) != 1 {
+	var adjustedTime, bucket = p.selectBucket(target)
+	p.keepConsistent(adjustedTime, bucket)
+	if len(p.window[0]) != 1 {
 		t.Fatal("data loss while adjusting internal state")
 	}
 	target = time.Unix(1, int64(50*time.Millisecond))
-	adjustedTime, bucket = w.selectBucket(target)
-	w.keepConsistent(adjustedTime, bucket)
-	if len(w.window[0]) != 1 {
+	adjustedTime, bucket = p.selectBucket(target)
+	p.keepConsistent(adjustedTime, bucket)
+	if len(p.window[0]) != 1 {
 		t.Fatal("data loss while adjusting internal state")
 	}
 	target = time.Unix(1, int64(5*50*time.Millisecond))
-	adjustedTime, bucket = w.selectBucket(target)
-	w.keepConsistent(adjustedTime, bucket)
-	if len(w.window[0]) != 1 {
+	adjustedTime, bucket = p.selectBucket(target)
+	p.keepConsistent(adjustedTime, bucket)
+	if len(p.window[0]) != 1 {
 		t.Fatal("data loss while adjusting internal state")
 	}
 	for x := 1; x < 5; x = x + 1 {
-		if len(w.window[x]) != 0 {
+		if len(p.window[x]) != 0 {
 			t.Fatal("internal state not kept consistent during time gap")
 		}
 	}
@@ -87,7 +95,8 @@ func TestTimeWindowConsistency(t *testing.T) {
 func TestTimeWindowDataRace(t *testing.T) {
 	var bucketSize = time.Millisecond
 	var numberBuckets = 1000
-	var w = NewTimeWindow(bucketSize, numberBuckets)
+	var w = NewWindow(numberBuckets)
+	var p = NewTimePolicy(w, bucketSize)
 	var stop = make(chan bool)
 	go func() {
 		for {
@@ -95,7 +104,7 @@ func TestTimeWindowDataRace(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				w.Append(1)
+				p.Append(1)
 				time.Sleep(time.Millisecond)
 			}
 		}
@@ -107,9 +116,14 @@ func TestTimeWindowDataRace(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				w.Iterate(func(p float64) {
-					v = v + p
-					v = math.Mod(v, float64(numberBuckets))
+				_ = p.Reduce(func(w Window) float64 {
+					for _, bucket := range w {
+						for _, p := range bucket {
+							v = v + p
+							v = math.Mod(v, float64(numberBuckets))
+						}
+					}
+					return 0
 				})
 			}
 		}
@@ -148,11 +162,12 @@ func BenchmarkTimeWindow(b *testing.B) {
 	b.ResetTimer()
 	for _, option := range options {
 		b.Run(option.name, func(bt *testing.B) {
-			var w = NewTimeWindow(option.bucketSize, option.numberBuckets)
+			var w = NewWindow(option.numberBuckets)
+			var p = NewTimePolicy(w, option.bucketSize)
 			bt.ResetTimer()
 			for n := 0; n < bt.N; n = n + 1 {
 				for x := 0; x < option.insertions; x = x + 1 {
-					w.Append(1)
+					p.Append(1)
 				}
 			}
 		})
