@@ -4,22 +4,28 @@
 
 ## Usage ##
 
-The package offers two different forms of a rolling window: one based on
-the number of data point and another based on time.
-
 ### Point Window ###
 
 ```golang
-var w = rolling.NewPointWindow(5)
+var p = rolling.NewPointPolicy(rolling.NewWindow(5))
 
 for x := 0; x < 5; x = x + 1 {
-  w.Append(x)
+  p.Append(x)
 }
-w.Iterate(func(v float64) { fmt.Printf("%d ")}) // 0 1 2 3 4
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [0] [1] [2] [3] [4] ]
+  return 0
+})
 w.Append(5)
-w.Iterate(func(v float64) { fmt.Printf("%d ")}) // 5 1 2 3 4
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [5] [1] [2] [3] [4] ]
+  return 0
+})
 w.Append(6)
-w.Iterate(func(v float64) { fmt.Printf("%d ")}) // 5 6 2 3 4
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [5] [6] [2] [3] [4] ]
+  return 0
+})
 ```
 
 The above creates a window that always contains 5 data points and then fills
@@ -32,13 +38,13 @@ for tracking data where time is not a factor.
 ### Time Window ###
 
 ```golang
-var w = rolling.NewTimeWindow(time.Millisecond, 3000)
+var p = rolling.NewTimeWindow(rolling.NewWindow(3000), time.Millisecond)
 var start = time.Now()
 for range time.Tick(time.Millisecond) {
   if time.Since(start) > 3*time.Second {
     break
   }
-  w.Append(1)
+  p.Append(1)
 }
 ```
 
@@ -59,25 +65,24 @@ request rates, error rates, and latencies of operations.
 
 ## Aggregating Windows ##
 
-Each window exposes an `Iterate(func(float64))` method that can be used to
-access the data stored within. Most uses of this method are reductions, or
-aggregations, of the data. This package includes some common aggregations
-as helpers.
+Each window exposes a `Reduce(func(w Window) float64) float64` method that can
+be used to aggregate the data stored within. The method takes in a function
+that can compute the contents of the `Window` into a single value. For
+convenience, this package provides some common reductions:
 
 ```golang
-fmt.Println(rolling.Count(w))
-fmt.Println(rolling.Avg(w))
-fmt.Println(rolling.Min(w))
-fmt.Println(rolling.Max(w))
-fmt.Println(rolling.Sum(w))
-fmt.Println(rolling.Percentile(99.9)(w))
-fmt.Println(rolling.FastPercentile(99.9)(w))
+fmt.Println(p.Reduce(rolling.Count))
+fmt.Println(p.Reduce(rolling.Avg))
+fmt.Println(p.Reduce(rolling.Min))
+fmt.Println(p.Reduce(rolling.Max))
+fmt.Println(p.Reduce(rolling.Sum))
+fmt.Println(p.Reduce(rolling.Percentile(99.9)))
+fmt.Println(p.Reduce(rolling.FastPercentile(99.9)))
 ```
 
-The `Count`, `Avg`, `Min`, `Max`, and `Sum` aggregators consume anything that
-has an `Iterate(func(float64))` method and perform their expected computation.
-The `Percentile` aggregator first takes the target percentile and returns
-an aggregating function that works identically to the `Sum`, et all.
+The `Count`, `Avg`, `Min`, `Max`, and `Sum` each perform their expected
+computation. The `Percentile` aggregator first takes the target percentile and
+returns an aggregating function that works identically to the `Sum`, et all.
 
 For cases of very large datasets, the `FastPercentile` can be used as a
 replacement for the standard percentile calculation. This alternative version
@@ -86,6 +91,25 @@ only one value at a time, in any order. The results are quite accurate but can
 vary from the *actual* percentile by a small amount. It's a tradeoff of accuracy
 for speed when calculating percentiles from large data sets. For more on the
 p-squared algorithm see: <http://www.cs.wustl.edu/~jain/papers/ftp/psqr.pdf>.
+
+#### Custom Aggregations ####
+
+Any function that matches the form of `func(rolling.Window)float64` may be given
+to the `Reduce` method of any window policy. The `Window` type is a named
+version of `[][]float64`. Calling `len(window)` will return the number of
+buckets. Each bucket is, itself, a slice of floats where `len(bucket)` is the
+number of values measured within that bucket. Most aggregate will take the form
+of:
+
+```golang
+func MyAggregate(w rolling.Window) float64 {
+  for _, bucket := range w {
+    for _, value := range bucket {
+      // aggregate something
+    }
+  }
+}
+```
 
 ## Contributors ##
 
