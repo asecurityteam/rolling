@@ -8,7 +8,7 @@ import (
 )
 
 func TestTimeWindow(t *testing.T) {
-	var bucketSize = time.Millisecond * 50
+	var bucketSize = time.Millisecond * 100
 	var numberBuckets = 10
 	var w = NewWindow(numberBuckets)
 	var p = NewTimePolicy(w, bucketSize)
