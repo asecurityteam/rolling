@@ -1,195 +1,123 @@
 # rolling #
 
-**A zero/low allocation rolling window library.**
+**A rolling/sliding window implementation for Google-golang**
 
-## Window Types ##
+## Usage ##
 
-The package comes with two, basic window types: time and value based.
-
-### Time Windows ###
+### Point Window ###
 
 ```golang
-var bucketSize = time.Millisecond
-var numberOfBuckets = 1000
-var preallocHint = 10000
-var w =  rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
+var p = rolling.NewPointPolicy(rolling.NewWindow(5))
+
+for x := 0; x < 5; x = x + 1 {
+  p.Append(x)
+}
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [0] [1] [2] [3] [4] ]
+  return 0
+})
+w.Append(5)
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [5] [1] [2] [3] [4] ]
+  return 0
+})
+w.Append(6)
+p.Reduce(func(w Window) float64 {
+  fmt.Println(w) // [ [5] [6] [2] [3] [4] ]
+  return 0
+})
 ```
 
-The above example shows a setup for a one second rolling window. The time window
-is determined by choosing a bucket size, which is used internally to partition
-data, and a number of buckets. The bucket size * number of buckets equals the
-total time that represents a window.
+The above creates a window that always contains 5 data points and then fills
+it with the values 0 - 4. When the next value is appended it will overwrite
+the first value. The window continuously overwrites the oldest value with the
+latest to preserve the specified value count. This type of window is useful
+for collecting data that have a known interval on which they are capture or
+for tracking data where time is not a factor.
 
-The pre-allocation hint is used to generate the initial size of the internal
-data structures with the intent of helping to avoid allocations at runtime. This
-value should be sufficiently high as to contain all the data points that might
-be collected within a given bucket. The data structure will expand as needed to
-accommodate any number of data elements so this value does not have to be
-strictly correct. It is purely an optimisation.
-
-### Value Windows ##
+### Time Window ###
 
 ```golang
-var windowSize = 1000
-var w = rolling.NewPointWindow(windowSize)
-```
-
-The above example shows a setup for a one thousand data point rolling window. As
-the number of elements exceeds the window size it will wrap around leaving only
-the last `windowSize` elements in the window at any given time.
-
-## Collecting Data ##
-
-Windows can be fed at any time and with any valid float64 value by using the
-`Feed(float64)` method attached.
-
-```golang
-for _ = range time.Tick(time.Millisecond) {
-  w.Feed(1)
+var p = rolling.NewTimeWindow(rolling.NewWindow(3000), time.Millisecond)
+var start = time.Now()
+for range time.Tick(time.Millisecond) {
+  if time.Since(start) > 3*time.Second {
+    break
+  }
+  p.Append(1)
 }
 ```
 
-Currently, only `float64` values are valid.
+The above creates a time window that contains 3,000 buckets where each bucket
+contains, at most, 1ms of recorded data. The subsequent loop populates each
+bucket with exactly one measure (the value 1) and stops when the window is full.
+As time progresses, the oldest values will be removed such that if the above
+code performed a `time.Sleep(3*time.Second)` then the window would be empty
+again.
 
-## Aggregating Data ##
+The choice of bucket size depends on the frequency with which data are expected
+to be recorded. On each increment of time equal to the given duration the window
+will expire one bucket and purge the collected values. The smaller the bucket
+duration then the less data are lost when a bucket expires.
 
-The most common use case for a rolling window is to produce some aggregate value
-from it. Each window allows raw access to data through the
-`Iterate(func(float64))` method. This method will call the given function on
-each data point contained within the window.
+This type of bucket is most useful for collecting real-time values such as
+request rates, error rates, and latencies of operations.
 
-For ease of use, some common aggregations are included in this package. Namely,
+## Aggregating Windows ##
 
-- NewCountRollup(iterator Iterator, name string)
-- NewSumRollup(iterator Iterator, name string)
-- NewMinRollup(iterator Iterator, name string)
-- NewMaxRollup(iterator Iterator, name string)
-- NewAverageRollup(iterator Iterator, name string)
-- NewPercentileRollup(percentile float64, iterator Iterator, preallocHint int, name string)
-
-The count, sum, min, max, and average each run their respected aggregations on
-all data contained within a window. The percentile aggregate calculates the Nth
-percentile of values where N is any non-negative float64 value between 0.0 and
-100.0. Fractional percentiles, like 99.9, are acceptable.
-
-Sometimes one level of aggregation is enough if the intent is to report on some
-rolling metric value. However, there is occasionally the need to convert the
-aggregate into some other value for decision making. The most common evaluation
-is converting the aggregate into some percentage value for decision making. To
-make this easier, this package includes a
-`NewPercentageRollup(aggregator Aggregator, lower float64, upper float64, name string)`
-which, when the `Aggregate()` method is called, will take the result of the
-inner aggregate and generate a value that represents the percentage between
-`lower` and `upper` of that value. If the inner aggregate is less than the lower
-then the value is always 0.0. If the value is higher than the upper then the
-value is always 1.0.
-
-When evaluating data for decision making, it is also common practice to protect
-against sparse data. To help with this practice this package also contains a
-`NewLimitedRollup(limit int, iterator Iterator, rollup Rollup)`
-which will return 0.0 for all calls to `Aggregate()` when the given window
-contains less than `limit` values.
-
-## Examples ##
-
-### Rolling Average Of Values ###
+Each window exposes a `Reduce(func(w Window) float64) float64` method that can
+be used to aggregate the data stored within. The method takes in a function
+that can compute the contents of the `Window` into a single value. For
+convenience, this package provides some common reductions:
 
 ```golang
-var windowSize = 100
-// rolling 100 point window
-var window = rolling.NewPointWindow(windowSize)
-// aggregate values with an average
-var avg = rolling.NewAverageRollup(window, "average-value")
-
-for x := 0; x < 1000; x = x + 1 {
-  window.Feed(float64(x))
-  log.Printf("%s = %f\n", avg.Name(), avg.Aggregate())
-}
+fmt.Println(p.Reduce(rolling.Count))
+fmt.Println(p.Reduce(rolling.Avg))
+fmt.Println(p.Reduce(rolling.Min))
+fmt.Println(p.Reduce(rolling.Max))
+fmt.Println(p.Reduce(rolling.Sum))
+fmt.Println(p.Reduce(rolling.Percentile(99.9)))
+fmt.Println(p.Reduce(rolling.FastPercentile(99.9)))
 ```
 
-### Limited Ten Second Latency Window Reporting On 99th Percentile ###
+The `Count`, `Avg`, `Min`, `Max`, and `Sum` each perform their expected
+computation. The `Percentile` aggregator first takes the target percentile and
+returns an aggregating function that works identically to the `Sum`, et all.
+
+For cases of very large datasets, the `FastPercentile` can be used as a
+replacement for the standard percentile calculation. This alternative version
+uses the p-squared algorithm for estimating the percentile by processing
+only one value at a time, in any order. The results are quite accurate but can
+vary from the *actual* percentile by a small amount. It's a tradeoff of accuracy
+for speed when calculating percentiles from large data sets. For more on the
+p-squared algorithm see: <http://www.cs.wustl.edu/~jain/papers/ftp/psqr.pdf>.
+
+#### Custom Aggregations ####
+
+Any function that matches the form of `func(rolling.Window)float64` may be given
+to the `Reduce` method of any window policy. The `Window` type is a named
+version of `[][]float64`. Calling `len(window)` will return the number of
+buckets. Each bucket is, itself, a slice of floats where `len(bucket)` is the
+number of values measured within that bucket. Most aggregate will take the form
+of:
 
 ```golang
-var bucketSize = time.Second
-var numberOfBuckets = 10
-var preallocHint = 1000
-// ten second rolling window with a one second bucket
-var window =  rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
-// aggregate to a 99th percentile
-var percentile = rolling.NewPercentileRollup(99, window, preallocHint, "99th Percentile")
-// start emitting non-zero values after 100ms and emit for all values over 1s
-var percentage = rolling.NewPercentageRollup(window, .1, 1, "Percentage Slow")
-// ensure that there are at least as many points as required to satisfy the percentile
-var limited = rolling.NewLimitedRollup(100, w, percentage)
-
-for _ = range time.Tick(time.Millisecond) {
-  var start = time.Now()
-  // do some work here
-  w.Feed(time.Since(start).Seconds())
-  // roll a die and determine if we should report the latency. reporting will
-  // get more frequent as the 99th percentile of latency approaches 1s. all 99th
-  // percentiles beyond 1s will be reported.
-  var chance = rand.Float64()
-  if chance < limited.Aggregate() {
-    log.Printf("%s = %f\n", percentile.Name(), percentile.Aggregate())
+func MyAggregate(w rolling.Window) float64 {
+  for _, bucket := range w {
+    for _, value := range bucket {
+      // aggregate something
+    }
   }
 }
 ```
 
-### Dice Roll Percentage From Multiple Metrics ###
-
-```golang
-var bucketSize = time.Millisecond
-var numberOfBuckets = 1000
-var preallocHint = 1000
-// one second rolling windows for latency data
-var incomingRequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
-var outgoingrequests = rolling.NewTimeWindow(bucketSize, numberOfBuckets, preallocHint)
-
-go func(w rolling.Window){
-  for {
-    // Record incoming latency data
-  }
-}(incomingRequests)
-go func(w rolling.Window){
-  for {
-    // Record outgoing latency data
-  }
-}(outgoingRequests)
-
-var incomingAvg = rolling.NewAverageAggregator(incomingRequests)
-var outgoingAvg = rolling.NewAverageAggregator(outgoingRequests)
-var lower = .1
-var upper = 1.0
-// generate a percentage between 100ms and 1000ms of the reported avg
-// latency for incoming and outgoing request metrics.
-var percIncoming = rolling.NewPercentageAggregator(incomingAvg, lower, upper)
-var percOutgoing = rolling.NewPercentageAggregator(outgoingAvg, lower, upper)
-
-for {
-  // Select the maximum reported percentage value and compare it to a dice
-  // roll. This can be used to implement proportional branching of behaviour
-  // based on the reported values.
-  var chance = percIncoming.Aggregate()
-  var outgoingChance = perceOutgoing.Aggregate()
-  if outgoingChance.Value > chance.Value {
-    chance = outgoingChance
-  }
-  var diceRoll = rand.Float64()
-  if diceRoll < chance.Value {
-    // Do something different than usual.
-  }
-}
-```
-
-Contributors
-============
+## Contributors ##
 
 Pull requests, issues and comments welcome. For pull requests:
 
-* Add tests for new features and bug fixes
-* Follow the existing style
-* Separate unrelated changes into multiple pull requests
+*   Add tests for new features and bug fixes
+*   Follow the existing style
+*   Separate unrelated changes into multiple pull requests
 
 See the existing issues for things to start contributing.
 
@@ -207,11 +135,10 @@ link below to digitally sign the CLA. The Corporate CLA is for those who are
 contributing as a member of an organization and the individual CLA is for
 those contributing as an individual.
 
-* [CLA for corporate contributors](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=e1c17c66-ca4d-4aab-a953-2c231af4a20b)
-* [CLA for individuals](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=3f94fbdc-2fbe-46ac-b14c-5d152700ae5d)
+*   [CLA for corporate contributors](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=e1c17c66-ca4d-4aab-a953-2c231af4a20b)
+*   [CLA for individuals](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=3f94fbdc-2fbe-46ac-b14c-5d152700ae5d)
 
-License
-========
+## License ##
 
 Copyright (c) 2017 Atlassian and others.
 Apache 2.0 licensed, see [LICENSE.txt](LICENSE.txt) file.
