@@ -1,0 +1,18 @@
+language: go
+go:
+- 1.11.x
+services:
+  - docker
+install:
+  - go get -u golang.org/x/tools/cmd/goimports
+  - go get -u github.com/alecthomas/gometalinter
+script:
+  - if [[ "$(goimports -l -d .)" != "" ]]; then echo "$(goimports -l -d .)" && exit 1; fi
+  - gometalinter --install --update
+  - gometalinter --vendor --disable-all --enable=vet --enable=vetshadow --enable=golint --enable=ineffassign --enable=goconst --tests .
+  - echo '# Generate coverage report and test for race conditions'
+  - go test -race -cover
+  - echo '# Generate a CPU benchmark'
+  - go test -bench .
+  - echo '# Generate a memory benchmark'
+  - go test -bench . -benchmem
