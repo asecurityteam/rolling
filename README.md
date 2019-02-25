@@ -1,10 +1,26 @@
-# rolling #
+<a id="markdown-rolling" name="rolling"></a>
+# rolling
 
 **A rolling/sliding window implementation for Google-golang**
 
-## Usage ##
+<!-- TOC -->
 
-### Point Window ###
+- [rolling](#rolling)
+    - [Usage](#usage)
+        - [Point Window](#point-window)
+        - [Time Window](#time-window)
+    - [Aggregating Windows](#aggregating-windows)
+            - [Custom Aggregations](#custom-aggregations)
+    - [Contributors](#contributors)
+    - [License](#license)
+
+<!-- /TOC -->
+
+<a id="markdown-usage" name="usage"></a>
+## Usage
+
+<a id="markdown-point-window" name="point-window"></a>
+### Point Window
 
 ```golang
 var p = rolling.NewPointPolicy(rolling.NewWindow(5))
@@ -35,7 +51,8 @@ latest to preserve the specified value count. This type of window is useful
 for collecting data that have a known interval on which they are capture or
 for tracking data where time is not a factor.
 
-### Time Window ###
+<a id="markdown-time-window" name="time-window"></a>
+### Time Window
 
 ```golang
 var p = rolling.NewTimeWindow(rolling.NewWindow(3000), time.Millisecond)
@@ -63,7 +80,8 @@ duration then the less data are lost when a bucket expires.
 This type of bucket is most useful for collecting real-time values such as
 request rates, error rates, and latencies of operations.
 
-## Aggregating Windows ##
+<a id="markdown-aggregating-windows" name="aggregating-windows"></a>
+## Aggregating Windows
 
 Each window exposes a `Reduce(func(w Window) float64) float64` method that can
 be used to aggregate the data stored within. The method takes in a function
@@ -82,7 +100,7 @@ fmt.Println(p.Reduce(rolling.FastPercentile(99.9)))
 
 The `Count`, `Avg`, `Min`, `Max`, and `Sum` each perform their expected
 computation. The `Percentile` aggregator first takes the target percentile and
-returns an aggregating function that works identically to the `Sum`, et all.
+returns an aggregating function that works identically to the `Sum`, et al.
 
 For cases of very large datasets, the `FastPercentile` can be used as a
 replacement for the standard percentile calculation. This alternative version
@@ -92,7 +110,8 @@ vary from the *actual* percentile by a small amount. It's a tradeoff of accuracy
 for speed when calculating percentiles from large data sets. For more on the
 p-squared algorithm see: <http://www.cs.wustl.edu/~jain/papers/ftp/psqr.pdf>.
 
-#### Custom Aggregations ####
+<a id="markdown-custom-aggregations" name="custom-aggregations"></a>
+#### Custom Aggregations
 
 Any function that matches the form of `func(rolling.Window)float64` may be given
 to the `Reduce` method of any window policy. The `Window` type is a named
@@ -111,7 +130,8 @@ func MyAggregate(w rolling.Window) float64 {
 }
 ```
 
-## Contributors ##
+<a id="markdown-contributors" name="contributors"></a>
+## Contributors
 
 Pull requests, issues and comments welcome. For pull requests:
 
@@ -138,7 +158,8 @@ those contributing as an individual.
 *   [CLA for corporate contributors](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=e1c17c66-ca4d-4aab-a953-2c231af4a20b)
 *   [CLA for individuals](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=3f94fbdc-2fbe-46ac-b14c-5d152700ae5d)
 
-## License ##
+<a id="markdown-license" name="license"></a>
+## License
 
 Copyright (c) 2017 Atlassian and others.
 Apache 2.0 licensed, see [LICENSE.txt](LICENSE.txt) file.

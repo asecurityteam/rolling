@@ -179,6 +179,9 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
+# VSCODE
+.vscode
+
 # -*- mode: gitignore; -*-
 *~
 \#*\#
