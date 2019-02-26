@@ -5,6 +5,7 @@ go:
 services:
   - docker
 install:
+  - chmod 777 -R "$(pwd)"
   - make dep
 script:
   - make lint
