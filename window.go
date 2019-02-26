@@ -1,6 +1,6 @@
 package rolling
 
-// Window represents a bucketed set of data. It should be used in conjuction
+// Window represents a bucketed set of data. It should be used in conjunction
 // with a Policy to populate it with data using some windowing policy.
 type Window [][]float64
 
