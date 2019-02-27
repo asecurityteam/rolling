@@ -88,9 +88,7 @@ func Percentile(perc float64) func(w Window) float64 {
 
 		values = values[:0]
 		for _, bucket := range w {
-			for _, p := range bucket {
-				values = append(values, p)
-			}
+			values = append(values, bucket...)
 		}
 		sort.Float64s(values)
 		var position = (float64(len(values))*(perc/100) + .5) - 1
