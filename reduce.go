@@ -44,11 +44,12 @@ func Avg(w Window) float64 {
 // Min the values within the window.
 func Min(w Window) float64 {
 	var result = 0.0
-	var started = false
+	var started = true
 	for _, bucket := range w {
 		for _, p := range bucket {
-			if !started {
+			if started {
 				result = p
+				started = false
 				continue
 			}
 			if p < result {
@@ -62,11 +63,12 @@ func Min(w Window) float64 {
 // Max the values within the window.
 func Max(w Window) float64 {
 	var result = 0.0
-	var started = false
+	var started = true
 	for _, bucket := range w {
 		for _, p := range bucket {
-			if !started {
+			if started {
 				result = p
+				started = false
 				continue
 			}
 			if p > result {

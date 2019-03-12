@@ -16,6 +16,37 @@ var largeEpsilon = 0.001
 
 func floatMostlyEquals(a float64, b float64) bool {
 	return (a-b) < largeEpsilon && (b-a) < largeEpsilon
+
+}
+
+func TestMax(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(100.0 - float64(x))
+	}
+	var result = p.Reduce(Max)
+
+	var expected = 99.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("max calculated incorrectly: %f versus %f", expected, result)
+	}
+}
+
+func TestMin(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(float64(x))
+	}
+	var result = p.Reduce(Min)
+
+	var expected = 1.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("Min calculated incorrectly: %f versus %f", expected, result)
+	}
 }
 
 func TestPercentileAggregateInterpolateWhenInsufficientData(t *testing.T) {
