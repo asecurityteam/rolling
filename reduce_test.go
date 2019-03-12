@@ -19,7 +19,7 @@ func floatMostlyEquals(a float64, b float64) bool {
 
 }
 
-func TestMaxAggregateInterpolateWhenInsufficientData(t *testing.T) {
+func TestMax(t *testing.T) {
 	var numberOfPoints = 100
 	var w = NewWindow(numberOfPoints)
 	var p = NewPointPolicy(w)
@@ -34,7 +34,7 @@ func TestMaxAggregateInterpolateWhenInsufficientData(t *testing.T) {
 	}
 }
 
-func TestMinAggregateInterpolateWhenInsufficientData(t *testing.T) {
+func TestMin(t *testing.T) {
 	var numberOfPoints = 100
 	var w = NewWindow(numberOfPoints)
 	var p = NewPointPolicy(w)
