@@ -19,6 +19,66 @@ func floatMostlyEquals(a float64, b float64) bool {
 
 }
 
+func TestCount(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(float64(x))
+	}
+	var result = p.Reduce(Count)
+
+	var expected = 100.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("count calculated incorrectly: %f versus %f", expected, result)
+	}
+}
+
+func TestCountPreallocatedWindow(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewPreallocatedWindow(numberOfPoints, 100)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(float64(x))
+	}
+	var result = p.Reduce(Count)
+
+	var expected = 100.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("count with prealloc window calculated incorrectly: %f versus %f", expected, result)
+	}
+}
+
+func TestSum(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(float64(x))
+	}
+	var result = p.Reduce(Sum)
+
+	var expected = 5050.0
+	if !floatEquals(result, expected) {
+		t.Fatalf("avg calculated incorrectly: %f versus %f", expected, result)
+	}
+}
+
+func TestAvg(t *testing.T) {
+	var numberOfPoints = 100
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	for x := 1; x <= numberOfPoints; x = x + 1 {
+		p.Append(float64(x))
+	}
+	var result = p.Reduce(Avg)
+
+	var expected = 50.5
+	if !floatEquals(result, expected) {
+		t.Fatalf("avg calculated incorrectly: %f versus %f", expected, result)
+	}
+}
+
 func TestMax(t *testing.T) {
 	var numberOfPoints = 100
 	var w = NewWindow(numberOfPoints)
