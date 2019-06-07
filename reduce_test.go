@@ -109,6 +109,18 @@ func TestMin(t *testing.T) {
 	}
 }
 
+func TestPercentileAggregateInterpolateWhenEmpty(t *testing.T) {
+	var numberOfPoints = 0
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	var perc = 99.9
+	var a = Percentile(perc)
+	var result = p.Reduce(a)
+	if !floatEquals(result, 0) {
+		t.Fatalf("percentile should be zero but got %f", result)
+	}
+}
+
 func TestPercentileAggregateInterpolateWhenInsufficientData(t *testing.T) {
 	var numberOfPoints = 100
 	var w = NewWindow(numberOfPoints)
@@ -144,6 +156,18 @@ func TestPercentileAggregateInterpolateWhenSufficientData(t *testing.T) {
 	var expected = 999.5
 	if !floatEquals(result, expected) {
 		t.Fatalf("%f percentile calculated incorrectly: %f versus %f", perc, expected, result)
+	}
+}
+
+func TestFastPercentileAggregateInterpolateWhenEmpty(t *testing.T) {
+	var numberOfPoints = 0
+	var w = NewWindow(numberOfPoints)
+	var p = NewPointPolicy(w)
+	var perc = 99.9
+	var a = FastPercentile(perc)
+	var result = p.Reduce(a)
+	if !floatEquals(result, 0) {
+		t.Fatalf("fast percentile should be zero but got %f", result)
 	}
 }
 
