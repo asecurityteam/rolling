@@ -92,6 +92,9 @@ func Percentile(perc float64) func(w Window) float64 {
 		for _, bucket := range w {
 			values = append(values, bucket...)
 		}
+		if len(values) < 1 {
+			return 0.0
+		}
 		sort.Float64s(values)
 		var position = (float64(len(values))*(perc/100) + .5) - 1
 		var k = int(math.Floor(position))
@@ -196,6 +199,9 @@ func FastPercentile(perc float64) func(w Window) float64 {
 			}
 		}
 
+		if observations < 1 {
+			return 0.0
+		}
 		// If we have less than five values then degenerate into a max function.
 		// This is a reasonable value for data sets this small.
 		if observations < 5 {
