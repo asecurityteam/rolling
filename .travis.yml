@@ -1,13 +1,13 @@
 language: go
 sudo: false
 go:
-- 1.11.x
+  - 1.12.x
 services:
   - docker
 install:
   - chmod 777 -R "$(pwd)"
-  - make dep
 script:
+  - travis_retry make dep
   - make lint
   - make test
   - make integration
