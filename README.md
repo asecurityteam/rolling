@@ -1,6 +1,8 @@
 <a id="markdown-rolling" name="rolling"></a>
 # rolling
 [![GoDoc](https://godoc.org/github.com/asecurityteam/rolling?status.svg)](https://godoc.org/github.com/asecurityteam/rolling)
+[![Build Status](https://travis-ci.com/asecurityteam/rolling.png?branch=master)](https://travis-ci.com/asecurityteam/rolling)
+[![codecov.io](https://codecov.io/github/asecurityteam/rolling/coverage.svg?branch=master)](https://codecov.io/github/asecurityteam/rolling?branch=master)
 
 **A rolling/sliding window implementation for Google-golang**
 
