@@ -8,13 +8,11 @@ import (
 
 // Count returns the number of elements in a window.
 func Count(w Window) float64 {
-	var result = 0.0
+	result := 0
 	for _, bucket := range w {
-		for range bucket {
-			result = result + 1
-		}
+		result += len(bucket)
 	}
-	return result
+	return float64(result)
 }
 
 // Sum the values within the window.
