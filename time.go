@@ -79,7 +79,11 @@ func (w *TimePolicy) AppendWithTimestamp(value float64, timestamp time.Time) {
 
 	var adjustedTime, windowOffset = w.selectBucket(timestamp)
 	w.keepConsistent(adjustedTime, windowOffset)
-	w.window[windowOffset] = append(w.window[windowOffset], value)
+	if w.lastWindowOffset != windowOffset {
+		w.window[windowOffset] = []float64{value}
+	} else {
+		w.window[windowOffset] = append(w.window[windowOffset], value)
+	}
 	w.lastWindowTime = adjustedTime
 	w.lastWindowOffset = windowOffset
 }
