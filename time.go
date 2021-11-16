@@ -72,16 +72,21 @@ func (w *TimePolicy) selectBucket(currentTime time.Time) (int64, int) {
 	return adjustedTime, windowOffset
 }
 
-// Append a value to the window using a time bucketing strategy.
-func (w *TimePolicy) Append(value float64) {
+// AppendWithTimestamp same as Append but with timestamp as parameter
+func (w *TimePolicy) AppendWithTimestamp(value float64, timestamp time.Time) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	var adjustedTime, windowOffset = w.selectBucket(time.Now())
+	var adjustedTime, windowOffset = w.selectBucket(timestamp)
 	w.keepConsistent(adjustedTime, windowOffset)
 	w.window[windowOffset] = append(w.window[windowOffset], value)
 	w.lastWindowTime = adjustedTime
 	w.lastWindowOffset = windowOffset
+}
+
+// Append a value to the window using a time bucketing strategy.
+func (w *TimePolicy) Append(value float64) {
+	w.AppendWithTimestamp(value, time.Now())
 }
 
 // Reduce the window to a single value using a reduction function.
