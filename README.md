@@ -1,8 +1,20 @@
 <a id="markdown-rolling" name="rolling"></a>
 # rolling
 [![GoDoc](https://godoc.org/github.com/asecurityteam/rolling?status.svg)](https://godoc.org/github.com/asecurityteam/rolling)
-[![Build Status](https://travis-ci.com/asecurityteam/rolling.png?branch=master)](https://travis-ci.com/asecurityteam/rolling)
-[![codecov.io](https://codecov.io/github/asecurityteam/rolling/coverage.svg?branch=master)](https://codecov.io/github/asecurityteam/rolling?branch=master)
+
+
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=bugs)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=code_smells)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=coverage)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=duplicated_lines_density)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=ncloc)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=alert_status)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=reliability_rating)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=security_rating)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=sqale_index)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=asecurityteam_rolling&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=asecurityteam_rolling)
+
 
 **A rolling/sliding window implementation for Google-golang**
 
