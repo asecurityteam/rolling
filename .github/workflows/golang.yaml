@@ -27,7 +27,7 @@ jobs:
       - name: Integration Tests
         run: make integration
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # run on PRs and once we merge to main, as we need baseline runs for main in Sonar
