@@ -149,7 +149,7 @@ func FastPercentile(perc float64) func(w Window) float64 {
 				}
 				var k int // k is the target cell to increment
 				switch {
-				case v < q[0]:
+				case v < q[0]: // nolint:gosec // G602: q is a fixed-size array [5]float64, bounds are guaranteed
 					q[0] = v
 					k = 0
 				case q[0] <= v && v < q[1]:
@@ -175,7 +175,7 @@ func FastPercentile(perc float64) func(w Window) float64 {
 				for x := 1; x < 4; x = x + 1 {
 					var d = nPrime[x] - float64(n[x])
 					if (d >= 1 && (n[x+1]-n[x]) > 1) ||
-						(d <= -1 && (n[x-1]-n[x]) < -1) {
+						(d <= -1 && (n[x-1]-n[x]) < -1) { // nolint:gosec // G602: n is a fixed-size array [5]int, x-1 is safe since x >= 1
 						var s = sign(d)
 						var si = int(s)
 						var nx = float64(n[x])
